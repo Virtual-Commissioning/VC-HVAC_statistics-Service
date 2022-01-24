@@ -1,10 +1,10 @@
-# VC-Varmenet-Service
+# VC-HVAC_statistics-Service
 
 ## How to run development server
 
 To run the development server, clone this repository to the desired location.
 
-**Run below code in VC-Varmenet-Service repo**
+**Run below code in VC-HVAC_statistics-Service repo**
 
 **Step 1:**
 Create a virtual environment:
