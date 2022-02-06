@@ -1,7 +1,5 @@
-from cmath import sqrt
 import math
 import json
-from types import NoneType
 
 
 def is_ventilation(subsystem):
@@ -18,8 +16,8 @@ def is_flow_segment(component):
 
 def length_of_segment(component):
     
-    if component["ConnectedWith"][0] == "None" or component["ConnectedWith"][1] == "None":
-        return None
+    # if component["ConnectedWith"][0] == "None" or component["ConnectedWith"][1] == "None":
+    #     return None
 
     connector1_coordinates = component["ConnectedWith"][0]["Coordinate"]
     connector2_coordinates = component["ConnectedWith"][1]["Coordinate"]
@@ -52,30 +50,43 @@ def has_null_connector(component):
 def map_ventilation_duct(component):
     component_list = []
     
+    dimensions = component["ConnectedWith"][0]["Dimension"]
+    rounded_dimensions = []
+
+    for i in range(len(dimensions)):
+        rounded_dimensions.append(round(dimensions[i],3))
+    
     if has_null_connector(component):
         component_size = "0"
         segment_length = 1
         component_list.append(component_size)
         component_list.append(segment_length)
-
+    
     elif is_rectangular(component):
         segment_length = length_of_segment(component)
-        component_size = str(component["ConnectedWith"][0]["Dimension"]).replace(" ", "")
+        component_size = str(rounded_dimensions).replace(" ", "")
         component_list.append(component_size)
         component_list.append(segment_length)
 
     elif is_round(component):
         segment_length = length_of_segment(component)
-        component_size = str(component["ConnectedWith"][0]["Dimension"]).replace(" ", "")
+        component_size = str(rounded_dimensions).replace(" ", "")
         component_list.append(component_size)
         component_list.append(segment_length)
 
     return component_list
 
 def map_hydronic_pipe(component):
+
+    dimensions = component["ConnectedWith"][0]["Dimension"]
+    rounded_dimensions = []
+
+    for i in range(len(dimensions)):
+        rounded_dimensions.append(round(dimensions[i],3))
+
     component_list = []
     segment_length = length_of_segment(component)
-    component_size = str(component["ConnectedWith"][0]["Dimension"]).replace(" ", "")
+    component_size = str(rounded_dimensions).replace(" ", "")
     component_list.append(component_size)
     component_list.append(segment_length)
 
@@ -83,7 +94,7 @@ def map_hydronic_pipe(component):
 
 def map_component(component, types_of_components):
     if component["ComponentType"] not in types_of_components.keys():
-        types_of_components[component["ComponentType"]] = {"No. of Components": 0}
+        types_of_components[component["ComponentType"]] = {"No. of Components": 1}
 
     elif component["ComponentType"] in types_of_components.keys():
         types_of_components[component["ComponentType"]]["No. of Components"] += 1
@@ -98,6 +109,10 @@ def statistics_calculation(data):
     all_system = json.loads(data)
     all_components = all_system["system"]["SubSystems"]
     total_components = 0
+    ventilation_duct_count = 0
+    hydronic_pipe_count = 0
+    ducts_not_counted = 0
+    pipes_not_counted = 0
 
     for subsystem in all_components.values():
         
@@ -106,16 +121,38 @@ def statistics_calculation(data):
 
             if is_ventilation(subsystem):
                 if is_flow_segment(component):
+                    ventilation_duct_count += 1
                     ventilation_duct = map_ventilation_duct(component)
-                    ventilation_ducts[ventilation_duct[0]] = ventilation_duct[1]
+
+                    ventilation_duct_key = ventilation_duct[0]
+                    ventilation_duct_value = round(ventilation_duct[1],2) * 1000
+
+                    if ventilation_duct[0] in ventilation_ducts.keys():
+                        ventilation_ducts[ventilation_duct_key] += ventilation_duct_value
+                   
+                    else:
+                        ventilation_ducts[ventilation_duct_key] = ventilation_duct_value
+                    
+                    if has_null_connector(component) : ducts_not_counted += 1
 
                 else:
                     map_component(component, types_of_components)
             
             elif is_heating(subsystem) or is_cooling(subsystem):
                 if is_flow_segment(component):
+                    hydronic_pipe_count += 1
                     hydronic_pipe = map_hydronic_pipe(component)
-                    hydronic_pipes[hydronic_pipe[0]] = hydronic_pipe[1]
+
+                    hydronic_pipe_key = hydronic_pipe[0]
+                    hydronic_pipe_value = round(hydronic_pipe[1],2) * 1000
+
+                    if hydronic_pipe[0] in hydronic_pipes.keys():
+                        hydronic_pipes[hydronic_pipe_key] += hydronic_pipe_value
+                   
+                    else:
+                        hydronic_pipes[hydronic_pipe_key] = hydronic_pipe_value 
+
+                    if has_null_connector(component) : pipes_not_counted += 1
 
                 else:
                     map_component(component, types_of_components)
@@ -125,7 +162,11 @@ def statistics_calculation(data):
 
     statistics_of_components = {"Ventilation ducts": ventilation_ducts,
                                 "Hydronic pipes": hydronic_pipes,
+                                "Ducts not counted": ducts_not_counted,
+                                "Pipes not counted": pipes_not_counted,
                                 "Types of components": types_of_components,
+                                "Ventilation duct count": ventilation_duct_count,
+                                "Hydronic pipe count": hydronic_pipe_count,
                                 "Total components": total_components}
 
     return json.dumps(statistics_of_components)
